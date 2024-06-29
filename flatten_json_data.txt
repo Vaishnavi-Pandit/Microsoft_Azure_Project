@@ -1,0 +1,30 @@
+df=spark.read.format('json').load(raw_path)
+display(df)
+
+###flatten the data
+def read_nested_json(df):
+    column_list = []
+    for column_name in df.schema.names:
+        if isinstance(df.schema[column_name].dataType, ArrayType):
+            df = df.withColumn(column_name, explode(column_name).alias(column_name))
+            column_list.append(column_name)
+        elif isinstance(df.schema[column_name].dataType, StructType):
+            for field in df.schema[column_name].dataType.fields:
+                column_list.append(col(column_name + "." + field.name).alias(column_name + "_" + field.name))
+        else:
+            column_list.append(column_name)
+    df = df.select(column_list)
+    return df
+
+
+is_all_columns_flattened = False
+while not is_all_columns_flattened:
+    # existing columns are flattened and appended to the schema columns
+    df = read_nested_json(df)
+    is_all_columns_flattened = True
+    # check till all new columns are flattened
+    for column_name in df.schema.names:
+        if isinstance(df.schema[column_name].dataType, ArrayType):
+            is_all_columns_flattened = False
+        elif isinstance(df.schema[column_name].dataType, StructType):
+            is_all_columns_flattened = False
